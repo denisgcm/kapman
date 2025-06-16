@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapman - Kubernetes Pac-Man</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <h1>🎮 Kapman</h1>
+            <div class="game-info">
+                <div class="score">Score: <span id="score">0</span></div>
+                <div class="lives">Lives: <span id="lives">3</span></div>
+                <div class="level">Level: <span id="level">1</span></div>
+            </div>
+        </header>
+        
+        <div class="game-board">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div class="game-overlay" id="gameOverlay">
+                <div class="overlay-content">
+                    <h2 id="overlayTitle">Kapman</h2>
+                    <p id="overlayMessage">Press SPACE to start</p>
+                    <div class="controls">
+                        <p>Controls:</p>
+                        <p>Arrow Keys or WASD - Move</p>
+                        <p>P - Pause | R - Restart | SPACE - Start</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="high-scores">
+            <h3>High Scores</h3>
+            <div id="scoresList">Loading...</div>
+        </div>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
