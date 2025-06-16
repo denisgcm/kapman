@@ -298,27 +298,58 @@ class KapmanGame {
                     }
                 }
                 
-                // Move towards target
+                // Check if ghost is hitting an obstacle (can't continue in current direction)
+                const currentNextX = ghost.x + ghost.direction.x;
+                const currentNextY = ghost.y + ghost.direction.y;
+                const hitObstacle = !this.canMoveTo(currentNextX, currentNextY);
+                
+                // Get all possible moves
                 const possibleMoves = [
                     { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }
                 ];
                 
-                let bestMove = ghost.direction;
-                let bestDistance = Infinity;
-                
-                possibleMoves.forEach(move => {
+                // Filter valid moves (exclude reverse direction)
+                const validMoves = possibleMoves.filter(move => {
                     const newX = ghost.x + move.x;
                     const newY = ghost.y + move.y;
-                    
-                    if (this.canMoveTo(newX, newY) && 
-                        !(move.x === -ghost.direction.x && move.y === -ghost.direction.y)) {
-                        const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
-                        if (distance < bestDistance) {
-                            bestDistance = distance;
-                            bestMove = move;
-                        }
-                    }
+                    return this.canMoveTo(newX, newY) && 
+                           !(move.x === -ghost.direction.x && move.y === -ghost.direction.y);
                 });
+                
+                let bestMove = ghost.direction;
+                
+                if (validMoves.length > 0) {
+                    if (hitObstacle) {
+                        // When hitting obstacle, add randomness
+                        if (Math.random() < 0.4) { // 40% chance for random direction when hitting obstacle
+                            bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                        } else {
+                            // 60% chance to still pick optimal direction towards target
+                            let bestDistance = Infinity;
+                            validMoves.forEach(move => {
+                                const newX = ghost.x + move.x;
+                                const newY = ghost.y + move.y;
+                                const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
+                                if (distance < bestDistance) {
+                                    bestDistance = distance;
+                                    bestMove = move;
+                                }
+                            });
+                        }
+                    } else {
+                        // Not hitting obstacle, use normal pathfinding towards target
+                        let bestDistance = Infinity;
+                        validMoves.forEach(move => {
+                            const newX = ghost.x + move.x;
+                            const newY = ghost.y + move.y;
+                            const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
+                            if (distance < bestDistance) {
+                                bestDistance = distance;
+                                bestMove = move;
+                            }
+                        });
+                    }
+                }
                 
                 ghost.direction = bestMove;
                 
