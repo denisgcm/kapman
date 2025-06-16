@@ -12,9 +12,9 @@ class KapmanGame {
         this.level = 1;
         
         // Game dimensions
-        this.CELL_SIZE = 20;
-        this.MAZE_WIDTH = 40;
-        this.MAZE_HEIGHT = 30;
+        this.CELL_SIZE = 32;
+        this.MAZE_WIDTH = 25;
+        this.MAZE_HEIGHT = 18;
         
         // Colors
         this.COLORS = {
