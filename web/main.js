@@ -250,7 +250,7 @@ class KapmanGame {
             if (ghost.moveTimer >= currentMoveSpeed) {
                 ghost.moveTimer = 0; // Reset timer
                 
-                // Simple AI: move towards or away from Kapman
+                // Different AI behavior per ghost
                 if (this.frighteneMode) {
                     // Flee from Kapman
                     const dx = this.kapman.x - ghost.x;
@@ -260,8 +260,42 @@ class KapmanGame {
                         y: ghost.y - Math.sign(dy) * 10
                     };
                 } else {
-                    // Chase Kapman (simplified)
-                    ghost.target = { x: this.kapman.x, y: this.kapman.y };
+                    // Different behavior based on ghost index
+                    switch (index) {
+                        case 0: // Red ghost - direct chase
+                            ghost.target = { x: this.kapman.x, y: this.kapman.y };
+                            break;
+                        case 1: // Orange ghost - ambush (target ahead of Kapman)
+                            ghost.target = {
+                                x: this.kapman.x + this.kapman.direction.x * 4,
+                                y: this.kapman.y + this.kapman.direction.y * 4
+                            };
+                            break;
+                        case 2: // Yellow ghost - patrol corners
+                            const corners = [
+                                { x: 2, y: 2 },
+                                { x: this.MAZE_WIDTH - 3, y: 2 },
+                                { x: this.MAZE_WIDTH - 3, y: this.MAZE_HEIGHT - 3 },
+                                { x: 2, y: this.MAZE_HEIGHT - 3 }
+                            ];
+                            const nearestCorner = corners.reduce((closest, corner) => {
+                                const distToCurrent = Math.abs(ghost.x - corner.x) + Math.abs(ghost.y - corner.y);
+                                const distToClosest = Math.abs(ghost.x - closest.x) + Math.abs(ghost.y - closest.y);
+                                return distToCurrent < distToClosest ? corner : closest;
+                            });
+                            ghost.target = nearestCorner;
+                            break;
+                        case 3: // Purple ghost - random but biased toward Kapman
+                            if (Math.random() < 0.7) {
+                                ghost.target = { x: this.kapman.x, y: this.kapman.y };
+                            } else {
+                                ghost.target = {
+                                    x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                                    y: Math.floor(Math.random() * this.MAZE_HEIGHT)
+                                };
+                            }
+                            break;
+                    }
                 }
                 
                 // Move towards target
