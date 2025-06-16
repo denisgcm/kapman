@@ -194,16 +194,16 @@ class KapmanGame {
     
     updateKapman() {
         // Try to change direction when player wants to
-        const newX = this.kapman.displayX + this.kapman.nextDirection.x;
-        const newY = this.kapman.displayY + this.kapman.nextDirection.y;
-        
-        // Check if we can change direction (close enough to grid center)
         const gridX = Math.round(this.kapman.displayX);
         const gridY = Math.round(this.kapman.displayY);
         const distToGrid = Math.abs(this.kapman.displayX - gridX) + Math.abs(this.kapman.displayY - gridY);
         
-        if (distToGrid < 0.1 && this.canMoveTo(gridX + this.kapman.nextDirection.x, gridY + this.kapman.nextDirection.y)) {
+        // Allow direction changes when reasonably close to grid center and path is clear
+        if (distToGrid < 0.3 && this.canMoveTo(gridX + this.kapman.nextDirection.x, gridY + this.kapman.nextDirection.y)) {
             this.kapman.direction = { ...this.kapman.nextDirection };
+            // Snap to grid to prevent getting stuck between positions
+            this.kapman.displayX = gridX;
+            this.kapman.displayY = gridY;
         }
         
         // Move Kapman smoothly
@@ -211,7 +211,7 @@ class KapmanGame {
             const nextX = this.kapman.displayX + this.kapman.direction.x * this.kapman.speed;
             const nextY = this.kapman.displayY + this.kapman.direction.y * this.kapman.speed;
             
-            // Check if next position is valid
+            // Check if next position is valid - be more lenient with boundaries
             const checkX = Math.round(nextX);
             const checkY = Math.round(nextY);
             
@@ -247,8 +247,17 @@ class KapmanGame {
                     }
                 }
             } else {
-                // Stop movement when hitting wall
-                this.kapman.direction = { x: 0, y: 0 };
+                // When hitting wall, snap to grid center to prevent getting stuck
+                const currentGridX = Math.round(this.kapman.displayX);
+                const currentGridY = Math.round(this.kapman.displayY);
+                this.kapman.displayX = currentGridX;
+                this.kapman.displayY = currentGridY;
+                
+                // Only stop movement if we have no queued direction change
+                if (this.kapman.nextDirection.x === this.kapman.direction.x && 
+                    this.kapman.nextDirection.y === this.kapman.direction.y) {
+                    this.kapman.direction = { x: 0, y: 0 };
+                }
             }
         }
         
@@ -348,22 +357,48 @@ class KapmanGame {
                     ghost.x = Math.round(ghost.displayX);
                     ghost.y = Math.round(ghost.displayY);
                 } else {
-                    // Hit a wall, pick a random valid direction
+                    // Hit a wall - snap to grid and find alternative path
+                    const currentGridX = Math.round(ghost.displayX);
+                    const currentGridY = Math.round(ghost.displayY);
+                    ghost.displayX = currentGridX;
+                    ghost.displayY = currentGridY;
+                    ghost.x = currentGridX;
+                    ghost.y = currentGridY;
+                    
+                    // Find all valid adjacent moves
                     const possibleMoves = [
                         { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }
                     ];
                     
                     const validMoves = possibleMoves.filter(move => {
-                        const newX = Math.round(ghost.displayX + move.x);
-                        const newY = Math.round(ghost.displayY + move.y);
+                        const newX = currentGridX + move.x;
+                        const newY = currentGridY + move.y;
                         return this.canMoveTo(newX, newY);
                     });
                     
                     if (validMoves.length > 0) {
-                        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                        // Prefer moves that get us closer to target, but add randomness
+                        const moveScores = validMoves.map(move => {
+                            const newX = currentGridX + move.x;
+                            const newY = currentGridY + move.y;
+                            const distToTarget = Math.abs(newX - ghost.target.x) + Math.abs(newY - ghost.target.y);
+                            return { move, score: -distToTarget + Math.random() * 2 }; // Add randomness
+                        });
+                        
+                        // Sort by score (higher is better)
+                        moveScores.sort((a, b) => b.score - a.score);
+                        const bestMove = moveScores[0].move;
+                        
+                        // Set new target a few cells ahead in the chosen direction
                         ghost.target = {
-                            x: ghost.displayX + randomMove.x * 3,
-                            y: ghost.displayY + randomMove.y * 3
+                            x: currentGridX + bestMove.x * 4,
+                            y: currentGridY + bestMove.y * 4
+                        };
+                    } else {
+                        // No valid moves - pick a new random target
+                        ghost.target = {
+                            x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                            y: Math.floor(Math.random() * this.MAZE_HEIGHT)
                         };
                     }
                 }
