@@ -1,8 +1,10 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +15,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	bolt "go.etcd.io/bbolt"
 )
+
+//go:embed web
+var staticFS embed.FS
 
 type Score struct {
 	Name  string    `json:"name"`
@@ -60,9 +65,12 @@ func main() {
 		r.Get("/scores", server.getHighScores)
 	})
 
-	// Serve static files from web directory
-	webDir := http.Dir("./web")
-	r.Handle("/*", http.FileServer(webDir))
+	// Serve embedded static files
+	webFS, err := fs.Sub(staticFS, "web")
+	if err != nil {
+		log.Fatal("Failed to create web filesystem:", err)
+	}
+	r.Handle("/*", http.FileServer(http.FS(webFS)))
 
 	fmt.Printf("🎮 Kapman server starting on http://localhost:%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

@@ -46,7 +46,7 @@ A Kubernetes-themed Pac-Man clone built with Go and HTML5 Canvas.
 
 2. **Build the game**:
    ```bash
-   go build -o kapman ./cmd/kapman
+   go build -o kapman .
    ```
 
 3. **Run the server**:
@@ -66,8 +66,7 @@ A Kubernetes-themed Pac-Man clone built with Go and HTML5 Canvas.
 ### Project Structure
 ```
 kapman/
-├── cmd/
-│   └── kapman/              # Go server entrypoint
+├── main.go                  # Go server with embedded frontend
 ├── internal/
 │   └── game/                # Game logic (future expansion)
 ├── web/
