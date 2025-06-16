@@ -98,16 +98,18 @@ class KapmanGame {
             y: 1,
             direction: { x: 0, y: 0 },
             nextDirection: { x: 0, y: 0 },
-            animationFrame: 0
+            animationFrame: 0,
+            moveTimer: 0,
+            moveSpeed: 8 // Move every 8 frames (about 7.5 moves per second at 60fps)
         };
     }
     
     initializeGhosts() {
         this.ghosts = [
-            { x: 19, y: 14, direction: { x: 1, y: 0 }, color: 0, mode: 'chase', target: { x: 0, y: 0 } },
-            { x: 20, y: 14, direction: { x: -1, y: 0 }, color: 1, mode: 'scatter', target: { x: 0, y: 0 } },
-            { x: 21, y: 14, direction: { x: 0, y: -1 }, color: 2, mode: 'chase', target: { x: 0, y: 0 } },
-            { x: 22, y: 14, direction: { x: 0, y: 1 }, color: 3, mode: 'scatter', target: { x: 0, y: 0 } }
+            { x: 19, y: 14, direction: { x: 1, y: 0 }, color: 0, mode: 'chase', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 10 },
+            { x: 20, y: 14, direction: { x: -1, y: 0 }, color: 1, mode: 'scatter', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 10 },
+            { x: 21, y: 14, direction: { x: 0, y: -1 }, color: 2, mode: 'chase', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 10 },
+            { x: 22, y: 14, direction: { x: 0, y: 1 }, color: 3, mode: 'scatter', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 10 }
         ];
         this.ghostModeTimer = 0;
         this.frighteneMode = false;
@@ -190,96 +192,115 @@ class KapmanGame {
     }
     
     updateKapman() {
-        // Try to change direction
-        const newX = this.kapman.x + this.kapman.nextDirection.x;
-        const newY = this.kapman.y + this.kapman.nextDirection.y;
+        // Increment move timer
+        this.kapman.moveTimer++;
         
-        if (this.canMoveTo(newX, newY)) {
-            this.kapman.direction = { ...this.kapman.nextDirection };
-        }
-        
-        // Move Kapman
-        const nextX = this.kapman.x + this.kapman.direction.x;
-        const nextY = this.kapman.y + this.kapman.direction.y;
-        
-        if (this.canMoveTo(nextX, nextY)) {
-            this.kapman.x = nextX;
-            this.kapman.y = nextY;
+        // Only move when timer reaches moveSpeed threshold
+        if (this.kapman.moveTimer >= this.kapman.moveSpeed) {
+            this.kapman.moveTimer = 0; // Reset timer
             
-            // Collect pod
-            if (this.maze[this.kapman.y][this.kapman.x] === 2) {
-                this.maze[this.kapman.y][this.kapman.x] = 0;
-                this.score += 10;
-                this.updateScore();
+            // Try to change direction
+            const newX = this.kapman.x + this.kapman.nextDirection.x;
+            const newY = this.kapman.y + this.kapman.nextDirection.y;
+            
+            if (this.canMoveTo(newX, newY)) {
+                this.kapman.direction = { ...this.kapman.nextDirection };
             }
-            // Collect super pod
-            else if (this.maze[this.kapman.y][this.kapman.x] === 3) {
-                this.maze[this.kapman.y][this.kapman.x] = 0;
-                this.score += 50;
-                this.activateFrightenedMode();
-                this.updateScore();
+            
+            // Move Kapman
+            const nextX = this.kapman.x + this.kapman.direction.x;
+            const nextY = this.kapman.y + this.kapman.direction.y;
+            
+            if (this.canMoveTo(nextX, nextY)) {
+                this.kapman.x = nextX;
+                this.kapman.y = nextY;
+                
+                // Collect pod
+                if (this.maze[this.kapman.y][this.kapman.x] === 2) {
+                    this.maze[this.kapman.y][this.kapman.x] = 0;
+                    this.score += 10;
+                    this.updateScore();
+                }
+                // Collect super pod
+                else if (this.maze[this.kapman.y][this.kapman.x] === 3) {
+                    this.maze[this.kapman.y][this.kapman.x] = 0;
+                    this.score += 50;
+                    this.activateFrightenedMode();
+                    this.updateScore();
+                }
             }
+            
+            // Handle tunnel effect (wrap around edges)
+            if (this.kapman.x < 0) this.kapman.x = this.MAZE_WIDTH - 1;
+            if (this.kapman.x >= this.MAZE_WIDTH) this.kapman.x = 0;
         }
-        
-        // Handle tunnel effect (wrap around edges)
-        if (this.kapman.x < 0) this.kapman.x = this.MAZE_WIDTH - 1;
-        if (this.kapman.x >= this.MAZE_WIDTH) this.kapman.x = 0;
         
         this.kapman.animationFrame += 0.2;
     }
     
     updateGhosts() {
         this.ghosts.forEach((ghost, index) => {
-            // Simple AI: move towards or away from Kapman
-            if (this.frighteneMode) {
-                // Flee from Kapman
-                const dx = this.kapman.x - ghost.x;
-                const dy = this.kapman.y - ghost.y;
-                ghost.target = {
-                    x: ghost.x - Math.sign(dx) * 10,
-                    y: ghost.y - Math.sign(dy) * 10
-                };
-            } else {
-                // Chase Kapman (simplified)
-                ghost.target = { x: this.kapman.x, y: this.kapman.y };
-            }
+            // Increment move timer
+            ghost.moveTimer++;
             
-            // Move towards target
-            const possibleMoves = [
-                { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }
-            ];
+            // Ghosts move slower when frightened
+            const currentMoveSpeed = this.frighteneMode ? ghost.moveSpeed + 5 : ghost.moveSpeed;
             
-            let bestMove = ghost.direction;
-            let bestDistance = Infinity;
-            
-            possibleMoves.forEach(move => {
-                const newX = ghost.x + move.x;
-                const newY = ghost.y + move.y;
+            // Only move when timer reaches moveSpeed threshold
+            if (ghost.moveTimer >= currentMoveSpeed) {
+                ghost.moveTimer = 0; // Reset timer
                 
-                if (this.canMoveTo(newX, newY) && 
-                    !(move.x === -ghost.direction.x && move.y === -ghost.direction.y)) {
-                    const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
-                    if (distance < bestDistance) {
-                        bestDistance = distance;
-                        bestMove = move;
-                    }
+                // Simple AI: move towards or away from Kapman
+                if (this.frighteneMode) {
+                    // Flee from Kapman
+                    const dx = this.kapman.x - ghost.x;
+                    const dy = this.kapman.y - ghost.y;
+                    ghost.target = {
+                        x: ghost.x - Math.sign(dx) * 10,
+                        y: ghost.y - Math.sign(dy) * 10
+                    };
+                } else {
+                    // Chase Kapman (simplified)
+                    ghost.target = { x: this.kapman.x, y: this.kapman.y };
                 }
-            });
-            
-            ghost.direction = bestMove;
-            
-            // Move ghost
-            const nextX = ghost.x + ghost.direction.x;
-            const nextY = ghost.y + ghost.direction.y;
-            
-            if (this.canMoveTo(nextX, nextY)) {
-                ghost.x = nextX;
-                ghost.y = nextY;
+                
+                // Move towards target
+                const possibleMoves = [
+                    { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }
+                ];
+                
+                let bestMove = ghost.direction;
+                let bestDistance = Infinity;
+                
+                possibleMoves.forEach(move => {
+                    const newX = ghost.x + move.x;
+                    const newY = ghost.y + move.y;
+                    
+                    if (this.canMoveTo(newX, newY) && 
+                        !(move.x === -ghost.direction.x && move.y === -ghost.direction.y)) {
+                        const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestMove = move;
+                        }
+                    }
+                });
+                
+                ghost.direction = bestMove;
+                
+                // Move ghost
+                const nextX = ghost.x + ghost.direction.x;
+                const nextY = ghost.y + ghost.direction.y;
+                
+                if (this.canMoveTo(nextX, nextY)) {
+                    ghost.x = nextX;
+                    ghost.y = nextY;
+                }
+                
+                // Handle tunnel effect
+                if (ghost.x < 0) ghost.x = this.MAZE_WIDTH - 1;
+                if (ghost.x >= this.MAZE_WIDTH) ghost.x = 0;
             }
-            
-            // Handle tunnel effect
-            if (ghost.x < 0) ghost.x = this.MAZE_WIDTH - 1;
-            if (ghost.x >= this.MAZE_WIDTH) ghost.x = 0;
         });
     }
     
