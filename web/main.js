@@ -101,19 +101,16 @@ class KapmanGame {
             direction: { x: 0, y: 0 },
             nextDirection: { x: 0, y: 0 },
             animationFrame: 0,
-            moveTimer: 0,
-            moveSpeed: 20, // Move every 20 frames (about 3 moves per second at 60fps)
-            isMoving: false,
-            moveProgress: 0
+            speed: 0.03 // Smooth movement speed (cells per frame at 60fps)
         };
     }
     
     initializeGhosts() {
         this.ghosts = [
-            { x: 19, y: 14, displayX: 19, displayY: 14, direction: { x: 1, y: 0 }, color: 0, mode: 'patrol', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 25, isMoving: false, moveProgress: 0 },
-            { x: 20, y: 14, displayX: 20, displayY: 14, direction: { x: -1, y: 0 }, color: 1, mode: 'patrol', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 25, isMoving: false, moveProgress: 0 },
-            { x: 21, y: 14, displayX: 21, displayY: 14, direction: { x: 0, y: -1 }, color: 2, mode: 'patrol', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 25, isMoving: false, moveProgress: 0 },
-            { x: 22, y: 14, displayX: 22, displayY: 14, direction: { x: 0, y: 1 }, color: 3, mode: 'patrol', target: { x: 0, y: 0 }, moveTimer: 0, moveSpeed: 25, isMoving: false, moveProgress: 0 }
+            { x: 19, y: 14, displayX: 19, displayY: 14, direction: { x: 1, y: 0 }, color: 0, mode: 'patrol', target: { x: 0, y: 0 }, speed: 0.025 },
+            { x: 20, y: 14, displayX: 20, displayY: 14, direction: { x: -1, y: 0 }, color: 1, mode: 'patrol', target: { x: 0, y: 0 }, speed: 0.025 },
+            { x: 21, y: 14, displayX: 21, displayY: 14, direction: { x: 0, y: -1 }, color: 2, mode: 'patrol', target: { x: 0, y: 0 }, speed: 0.025 },
+            { x: 22, y: 14, displayX: 22, displayY: 14, direction: { x: 0, y: 1 }, color: 3, mode: 'patrol', target: { x: 0, y: 0 }, speed: 0.025 }
         ];
         this.ghostModeTimer = 0;
         this.frighteneMode = false;
@@ -196,67 +193,62 @@ class KapmanGame {
     }
     
     updateKapman() {
-        // If currently moving, update smooth interpolation
-        if (this.kapman.isMoving) {
-            this.kapman.moveProgress += 1 / this.kapman.moveSpeed;
-            if (this.kapman.moveProgress >= 1) {
-                // Movement complete
-                this.kapman.moveProgress = 0;
-                this.kapman.isMoving = false;
-                this.kapman.displayX = this.kapman.x;
-                this.kapman.displayY = this.kapman.y;
+        // Try to change direction when player wants to
+        const newX = this.kapman.displayX + this.kapman.nextDirection.x;
+        const newY = this.kapman.displayY + this.kapman.nextDirection.y;
+        
+        // Check if we can change direction (close enough to grid center)
+        const gridX = Math.round(this.kapman.displayX);
+        const gridY = Math.round(this.kapman.displayY);
+        const distToGrid = Math.abs(this.kapman.displayX - gridX) + Math.abs(this.kapman.displayY - gridY);
+        
+        if (distToGrid < 0.1 && this.canMoveTo(gridX + this.kapman.nextDirection.x, gridY + this.kapman.nextDirection.y)) {
+            this.kapman.direction = { ...this.kapman.nextDirection };
+        }
+        
+        // Move Kapman smoothly
+        if (this.kapman.direction.x !== 0 || this.kapman.direction.y !== 0) {
+            const nextX = this.kapman.displayX + this.kapman.direction.x * this.kapman.speed;
+            const nextY = this.kapman.displayY + this.kapman.direction.y * this.kapman.speed;
+            
+            // Check if next position is valid
+            const checkX = Math.round(nextX);
+            const checkY = Math.round(nextY);
+            
+            if (this.canMoveTo(checkX, checkY)) {
+                this.kapman.displayX = nextX;
+                this.kapman.displayY = nextY;
                 
-                // Collect pod
-                if (this.maze[this.kapman.y][this.kapman.x] === 2) {
-                    this.maze[this.kapman.y][this.kapman.x] = 0;
-                    this.score += 10;
-                    this.updateScore();
-                }
-                // Collect super pod
-                else if (this.maze[this.kapman.y][this.kapman.x] === 3) {
-                    this.maze[this.kapman.y][this.kapman.x] = 0;
-                    this.score += 50;
-                    this.activateFrightenedMode();
-                    this.updateScore();
+                // Handle tunnel effect (wrap around edges)
+                if (this.kapman.displayX < 0) this.kapman.displayX = this.MAZE_WIDTH - 1;
+                if (this.kapman.displayX >= this.MAZE_WIDTH) this.kapman.displayX = 0;
+                
+                // Update grid position for collision detection
+                this.kapman.x = Math.round(this.kapman.displayX);
+                this.kapman.y = Math.round(this.kapman.displayY);
+                
+                // Collect pods when close to center of cell
+                const centerDistX = Math.abs(this.kapman.displayX - this.kapman.x);
+                const centerDistY = Math.abs(this.kapman.displayY - this.kapman.y);
+                
+                if (centerDistX < 0.3 && centerDistY < 0.3) {
+                    // Collect pod
+                    if (this.maze[this.kapman.y][this.kapman.x] === 2) {
+                        this.maze[this.kapman.y][this.kapman.x] = 0;
+                        this.score += 10;
+                        this.updateScore();
+                    }
+                    // Collect super pod
+                    else if (this.maze[this.kapman.y][this.kapman.x] === 3) {
+                        this.maze[this.kapman.y][this.kapman.x] = 0;
+                        this.score += 50;
+                        this.activateFrightenedMode();
+                        this.updateScore();
+                    }
                 }
             } else {
-                // Interpolate display position
-                const prevX = this.kapman.x - this.kapman.direction.x;
-                const prevY = this.kapman.y - this.kapman.direction.y;
-                this.kapman.displayX = prevX + (this.kapman.x - prevX) * this.kapman.moveProgress;
-                this.kapman.displayY = prevY + (this.kapman.y - prevY) * this.kapman.moveProgress;
-            }
-        } else {
-            // Not currently moving, check if we should start a new movement
-            this.kapman.moveTimer++;
-            
-            // Only start new movement when timer reaches moveSpeed threshold
-            if (this.kapman.moveTimer >= this.kapman.moveSpeed) {
-                this.kapman.moveTimer = 0; // Reset timer
-                
-                // Try to change direction
-                const newX = this.kapman.x + this.kapman.nextDirection.x;
-                const newY = this.kapman.y + this.kapman.nextDirection.y;
-                
-                if (this.canMoveTo(newX, newY)) {
-                    this.kapman.direction = { ...this.kapman.nextDirection };
-                }
-                
-                // Try to move Kapman
-                const nextX = this.kapman.x + this.kapman.direction.x;
-                const nextY = this.kapman.y + this.kapman.direction.y;
-                
-                if (this.canMoveTo(nextX, nextY)) {
-                    // Start new movement
-                    this.kapman.x = nextX;
-                    this.kapman.y = nextY;
-                    this.kapman.isMoving = true;
-                    this.kapman.moveProgress = 0;
-                    
-                    // Handle tunnel effect (wrap around edges)
-                    if (this.kapman.x < 0) this.kapman.x = this.MAZE_WIDTH - 1;
-                    if (this.kapman.x >= this.MAZE_WIDTH) this.kapman.x = 0;
-                }
+                // Stop movement when hitting wall
+                this.kapman.direction = { x: 0, y: 0 };
             }
         }
         
@@ -265,159 +257,114 @@ class KapmanGame {
     
     updateGhosts() {
         this.ghosts.forEach((ghost, index) => {
-            // If currently moving, update smooth interpolation
-            if (ghost.isMoving) {
-                ghost.moveProgress += 1 / ghost.moveSpeed;
-                if (ghost.moveProgress >= 1) {
-                    // Movement complete
-                    ghost.moveProgress = 0;
-                    ghost.isMoving = false;
-                    ghost.displayX = ghost.x;
-                    ghost.displayY = ghost.y;
-                } else {
-                    // Interpolate display position
-                    const prevX = ghost.x - ghost.direction.x;
-                    const prevY = ghost.y - ghost.direction.y;
-                    ghost.displayX = prevX + (ghost.x - prevX) * ghost.moveProgress;
-                    ghost.displayY = prevY + (ghost.y - prevY) * ghost.moveProgress;
-                }
+            // Calculate distance to Kapman
+            const distanceToKapman = Math.abs(ghost.displayX - this.kapman.displayX) + Math.abs(ghost.displayY - this.kapman.displayY);
+            
+            // Determine ghost behavior based on proximity (5 cells or less = chase)
+            if (distanceToKapman <= 5 && !this.frighteneMode) {
+                ghost.mode = 'chase';
+                ghost.target = { x: this.kapman.displayX, y: this.kapman.displayY };
             } else {
-                // Not currently moving, check if we should start a new movement
-                ghost.moveTimer++;
-                
-                // Ghosts move slower when frightened
-                const currentMoveSpeed = this.frighteneMode ? ghost.moveSpeed + 10 : ghost.moveSpeed;
-                
-                // Only start new movement when timer reaches moveSpeed threshold
-                if (ghost.moveTimer >= currentMoveSpeed) {
-                    ghost.moveTimer = 0; // Reset timer
-                    
-                    // Calculate distance to Kapman
-                    const distanceToKapman = Math.abs(ghost.x - this.kapman.x) + Math.abs(ghost.y - this.kapman.y);
-                    
-                    // Determine ghost behavior based on proximity (5 cells or less = chase)
-                    if (distanceToKapman <= 5 && !this.frighteneMode) {
-                        ghost.mode = 'chase';
-                        ghost.target = { x: this.kapman.x, y: this.kapman.y };
-                    } else {
-                        ghost.mode = 'patrol';
-                        // Different independent AI behavior per ghost when not in chase mode
-                        switch (index) {
-                            case 0: // Red ghost - horizontal patrol
-                                if (!ghost.patrolTarget || (ghost.x === ghost.patrolTarget.x && ghost.y === ghost.patrolTarget.y)) {
-                                    // Pick a new random horizontal target
-                                    ghost.patrolTarget = {
-                                        x: Math.floor(Math.random() * this.MAZE_WIDTH),
-                                        y: ghost.y
-                                    };
-                                }
-                                ghost.target = ghost.patrolTarget;
-                                break;
-                            case 1: // Orange ghost - vertical patrol
-                                if (!ghost.patrolTarget || (ghost.x === ghost.patrolTarget.x && ghost.y === ghost.patrolTarget.y)) {
-                                    // Pick a new random vertical target
-                                    ghost.patrolTarget = {
-                                        x: ghost.x,
-                                        y: Math.floor(Math.random() * this.MAZE_HEIGHT)
-                                    };
-                                }
-                                ghost.target = ghost.patrolTarget;
-                                break;
-                            case 2: // Yellow ghost - patrol corners
-                                const corners = [
-                                    { x: 2, y: 2 },
-                                    { x: this.MAZE_WIDTH - 3, y: 2 },
-                                    { x: this.MAZE_WIDTH - 3, y: this.MAZE_HEIGHT - 3 },
-                                    { x: 2, y: this.MAZE_HEIGHT - 3 }
-                                ];
-                                const nearestCorner = corners.reduce((closest, corner) => {
-                                    const distToCurrent = Math.abs(ghost.x - corner.x) + Math.abs(ghost.y - corner.y);
-                                    const distToClosest = Math.abs(ghost.x - closest.x) + Math.abs(ghost.y - closest.y);
-                                    return distToCurrent < distToClosest ? corner : closest;
-                                });
-                                ghost.target = nearestCorner;
-                                break;
-                            case 3: // Purple ghost - completely random movement
-                                if (!ghost.randomTarget || Math.random() < 0.1) { // Change target 10% of the time
-                                    ghost.randomTarget = {
-                                        x: Math.floor(Math.random() * this.MAZE_WIDTH),
-                                        y: Math.floor(Math.random() * this.MAZE_HEIGHT)
-                                    };
-                                }
-                                ghost.target = ghost.randomTarget;
-                                break;
+                ghost.mode = 'patrol';
+                // Different independent AI behavior per ghost when not in chase mode
+                switch (index) {
+                    case 0: // Red ghost - horizontal patrol
+                        if (!ghost.patrolTarget || Math.abs(ghost.displayX - ghost.patrolTarget.x) < 0.5) {
+                            // Pick a new random horizontal target
+                            ghost.patrolTarget = {
+                                x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                                y: ghost.y
+                            };
                         }
-                    }
+                        ghost.target = ghost.patrolTarget;
+                        break;
+                    case 1: // Orange ghost - vertical patrol
+                        if (!ghost.patrolTarget || Math.abs(ghost.displayY - ghost.patrolTarget.y) < 0.5) {
+                            // Pick a new random vertical target
+                            ghost.patrolTarget = {
+                                x: ghost.x,
+                                y: Math.floor(Math.random() * this.MAZE_HEIGHT)
+                            };
+                        }
+                        ghost.target = ghost.patrolTarget;
+                        break;
+                    case 2: // Yellow ghost - patrol corners
+                        const corners = [
+                            { x: 2, y: 2 },
+                            { x: this.MAZE_WIDTH - 3, y: 2 },
+                            { x: this.MAZE_WIDTH - 3, y: this.MAZE_HEIGHT - 3 },
+                            { x: 2, y: this.MAZE_HEIGHT - 3 }
+                        ];
+                        if (!ghost.patrolTarget || Math.abs(ghost.displayX - ghost.patrolTarget.x) + Math.abs(ghost.displayY - ghost.patrolTarget.y) < 0.5) {
+                            // Pick next corner
+                            ghost.currentCorner = (ghost.currentCorner || 0) + 1;
+                            if (ghost.currentCorner >= corners.length) ghost.currentCorner = 0;
+                            ghost.patrolTarget = corners[ghost.currentCorner];
+                        }
+                        ghost.target = ghost.patrolTarget;
+                        break;
+                    case 3: // Purple ghost - completely random movement
+                        if (!ghost.randomTarget || Math.random() < 0.02) { // Change target 2% of the time
+                            ghost.randomTarget = {
+                                x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                                y: Math.floor(Math.random() * this.MAZE_HEIGHT)
+                            };
+                        }
+                        ghost.target = ghost.randomTarget;
+                        break;
+                }
+            }
+            
+            // Calculate movement direction towards target
+            const dx = ghost.target.x - ghost.displayX;
+            const dy = ghost.target.y - ghost.displayY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 0.1) {
+                // Normalize direction
+                const dirX = dx / distance;
+                const dirY = dy / distance;
+                
+                // Apply speed (slower when frightened)
+                const currentSpeed = this.frighteneMode ? ghost.speed * 0.7 : ghost.speed;
+                
+                // Calculate next position
+                const nextX = ghost.displayX + dirX * currentSpeed;
+                const nextY = ghost.displayY + dirY * currentSpeed;
+                
+                // Check if we can move to the next position
+                const checkX = Math.round(nextX);
+                const checkY = Math.round(nextY);
+                
+                if (this.canMoveTo(checkX, checkY)) {
+                    ghost.displayX = nextX;
+                    ghost.displayY = nextY;
                     
-                    // Check if ghost is hitting an obstacle (can't continue in current direction)
-                    const currentNextX = ghost.x + ghost.direction.x;
-                    const currentNextY = ghost.y + ghost.direction.y;
-                    const hitObstacle = !this.canMoveTo(currentNextX, currentNextY);
+                    // Handle tunnel effect
+                    if (ghost.displayX < 0) ghost.displayX = this.MAZE_WIDTH - 1;
+                    if (ghost.displayX >= this.MAZE_WIDTH) ghost.displayX = 0;
                     
-                    // Get all possible moves
+                    // Update grid position
+                    ghost.x = Math.round(ghost.displayX);
+                    ghost.y = Math.round(ghost.displayY);
+                } else {
+                    // Hit a wall, pick a random valid direction
                     const possibleMoves = [
                         { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }
                     ];
                     
-                    // Filter valid moves (exclude reverse direction)
                     const validMoves = possibleMoves.filter(move => {
-                        const newX = ghost.x + move.x;
-                        const newY = ghost.y + move.y;
-                        return this.canMoveTo(newX, newY) && 
-                               !(move.x === -ghost.direction.x && move.y === -ghost.direction.y);
+                        const newX = Math.round(ghost.displayX + move.x);
+                        const newY = Math.round(ghost.displayY + move.y);
+                        return this.canMoveTo(newX, newY);
                     });
                     
-                    let bestMove = ghost.direction;
-                    
                     if (validMoves.length > 0) {
-                        if (hitObstacle) {
-                            // When hitting obstacle, add randomness only in patrol mode
-                            if (ghost.mode === 'patrol' && Math.random() < 0.4) { // 40% chance for random direction when hitting obstacle
-                                bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-                            } else {
-                                // Pick optimal direction towards target
-                                let bestDistance = Infinity;
-                                validMoves.forEach(move => {
-                                    const newX = ghost.x + move.x;
-                                    const newY = ghost.y + move.y;
-                                    const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
-                                    if (distance < bestDistance) {
-                                        bestDistance = distance;
-                                        bestMove = move;
-                                    }
-                                });
-                            }
-                        } else {
-                            // Not hitting obstacle, use normal pathfinding towards target
-                            let bestDistance = Infinity;
-                            validMoves.forEach(move => {
-                                const newX = ghost.x + move.x;
-                                const newY = ghost.y + move.y;
-                                const distance = Math.abs(ghost.target.x - newX) + Math.abs(ghost.target.y - newY);
-                                if (distance < bestDistance) {
-                                    bestDistance = distance;
-                                    bestMove = move;
-                                }
-                            });
-                        }
-                    }
-                    
-                    ghost.direction = bestMove;
-                    
-                    // Try to move ghost
-                    const nextX = ghost.x + ghost.direction.x;
-                    const nextY = ghost.y + ghost.direction.y;
-                    
-                    if (this.canMoveTo(nextX, nextY)) {
-                        // Start new movement
-                        ghost.x = nextX;
-                        ghost.y = nextY;
-                        ghost.isMoving = true;
-                        ghost.moveProgress = 0;
-                        
-                        // Handle tunnel effect
-                        if (ghost.x < 0) ghost.x = this.MAZE_WIDTH - 1;
-                        if (ghost.x >= this.MAZE_WIDTH) ghost.x = 0;
+                        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                        ghost.target = {
+                            x: ghost.displayX + randomMove.x * 3,
+                            y: ghost.displayY + randomMove.y * 3
+                        };
                     }
                 }
             }
@@ -434,12 +381,12 @@ class KapmanGame {
     checkCollisions() {
         this.ghosts.forEach((ghost, index) => {
             // Use display positions for smooth collision detection
-            const kapmanDisplayX = this.kapman.displayX || this.kapman.x;
-            const kapmanDisplayY = this.kapman.displayY || this.kapman.y;
-            const ghostDisplayX = ghost.displayX || ghost.x;
-            const ghostDisplayY = ghost.displayY || ghost.y;
+            const kapmanDisplayX = this.kapman.displayX;
+            const kapmanDisplayY = this.kapman.displayY;
+            const ghostDisplayX = ghost.displayX;
+            const ghostDisplayY = ghost.displayY;
             
-            if (Math.abs(ghostDisplayX - kapmanDisplayX) < 0.8 && Math.abs(ghostDisplayY - kapmanDisplayY) < 0.8) {
+            if (Math.abs(ghostDisplayX - kapmanDisplayX) < 0.6 && Math.abs(ghostDisplayY - kapmanDisplayY) < 0.6) {
                 if (this.frighteneMode) {
                     // Eat ghost
                     this.score += 200 * Math.pow(2, index);
@@ -449,8 +396,6 @@ class KapmanGame {
                     ghost.y = 14;
                     ghost.displayX = ghost.x;
                     ghost.displayY = ghost.y;
-                    ghost.isMoving = false;
-                    ghost.moveProgress = 0;
                 } else {
                     // Kapman dies
                     this.loseLife();
@@ -534,10 +479,8 @@ class KapmanGame {
     }
     
     renderKapman() {
-        const displayX = this.kapman.displayX || this.kapman.x;
-        const displayY = this.kapman.displayY || this.kapman.y;
-        const x = displayX * this.CELL_SIZE;
-        const y = displayY * this.CELL_SIZE;
+        const x = this.kapman.displayX * this.CELL_SIZE;
+        const y = this.kapman.displayY * this.CELL_SIZE;
         
         // Draw Kapman as a blue 'K'
         this.ctx.fillStyle = this.COLORS.KAPMAN;
@@ -560,10 +503,8 @@ class KapmanGame {
     
     renderGhosts() {
         this.ghosts.forEach((ghost, index) => {
-            const displayX = ghost.displayX || ghost.x;
-            const displayY = ghost.displayY || ghost.y;
-            const x = displayX * this.CELL_SIZE;
-            const y = displayY * this.CELL_SIZE;
+            const x = ghost.displayX * this.CELL_SIZE;
+            const y = ghost.displayY * this.CELL_SIZE;
             
             // Choose color based on mode
             let color = this.frighteneMode ? 
