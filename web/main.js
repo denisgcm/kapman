@@ -250,52 +250,51 @@ class KapmanGame {
             if (ghost.moveTimer >= currentMoveSpeed) {
                 ghost.moveTimer = 0; // Reset timer
                 
-                // Different AI behavior per ghost
-                if (this.frighteneMode) {
-                    // Flee from Kapman
-                    const dx = this.kapman.x - ghost.x;
-                    const dy = this.kapman.y - ghost.y;
-                    ghost.target = {
-                        x: ghost.x - Math.sign(dx) * 10,
-                        y: ghost.y - Math.sign(dy) * 10
-                    };
-                } else {
-                    // Different behavior based on ghost index
-                    switch (index) {
-                        case 0: // Red ghost - direct chase
-                            ghost.target = { x: this.kapman.x, y: this.kapman.y };
-                            break;
-                        case 1: // Orange ghost - ambush (target ahead of Kapman)
-                            ghost.target = {
-                                x: this.kapman.x + this.kapman.direction.x * 4,
-                                y: this.kapman.y + this.kapman.direction.y * 4
+                // Different AI behavior per ghost - completely independent of player
+                switch (index) {
+                    case 0: // Red ghost - horizontal patrol
+                        if (!ghost.patrolTarget || (ghost.x === ghost.patrolTarget.x && ghost.y === ghost.patrolTarget.y)) {
+                            // Pick a new random horizontal target
+                            ghost.patrolTarget = {
+                                x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                                y: ghost.y
                             };
-                            break;
-                        case 2: // Yellow ghost - patrol corners
-                            const corners = [
-                                { x: 2, y: 2 },
-                                { x: this.MAZE_WIDTH - 3, y: 2 },
-                                { x: this.MAZE_WIDTH - 3, y: this.MAZE_HEIGHT - 3 },
-                                { x: 2, y: this.MAZE_HEIGHT - 3 }
-                            ];
-                            const nearestCorner = corners.reduce((closest, corner) => {
-                                const distToCurrent = Math.abs(ghost.x - corner.x) + Math.abs(ghost.y - corner.y);
-                                const distToClosest = Math.abs(ghost.x - closest.x) + Math.abs(ghost.y - closest.y);
-                                return distToCurrent < distToClosest ? corner : closest;
-                            });
-                            ghost.target = nearestCorner;
-                            break;
-                        case 3: // Purple ghost - random but biased toward Kapman
-                            if (Math.random() < 0.7) {
-                                ghost.target = { x: this.kapman.x, y: this.kapman.y };
-                            } else {
-                                ghost.target = {
-                                    x: Math.floor(Math.random() * this.MAZE_WIDTH),
-                                    y: Math.floor(Math.random() * this.MAZE_HEIGHT)
-                                };
-                            }
-                            break;
-                    }
+                        }
+                        ghost.target = ghost.patrolTarget;
+                        break;
+                    case 1: // Orange ghost - vertical patrol
+                        if (!ghost.patrolTarget || (ghost.x === ghost.patrolTarget.x && ghost.y === ghost.patrolTarget.y)) {
+                            // Pick a new random vertical target
+                            ghost.patrolTarget = {
+                                x: ghost.x,
+                                y: Math.floor(Math.random() * this.MAZE_HEIGHT)
+                            };
+                        }
+                        ghost.target = ghost.patrolTarget;
+                        break;
+                    case 2: // Yellow ghost - patrol corners
+                        const corners = [
+                            { x: 2, y: 2 },
+                            { x: this.MAZE_WIDTH - 3, y: 2 },
+                            { x: this.MAZE_WIDTH - 3, y: this.MAZE_HEIGHT - 3 },
+                            { x: 2, y: this.MAZE_HEIGHT - 3 }
+                        ];
+                        const nearestCorner = corners.reduce((closest, corner) => {
+                            const distToCurrent = Math.abs(ghost.x - corner.x) + Math.abs(ghost.y - corner.y);
+                            const distToClosest = Math.abs(ghost.x - closest.x) + Math.abs(ghost.y - closest.y);
+                            return distToCurrent < distToClosest ? corner : closest;
+                        });
+                        ghost.target = nearestCorner;
+                        break;
+                    case 3: // Purple ghost - completely random movement
+                        if (!ghost.randomTarget || Math.random() < 0.1) { // Change target 10% of the time
+                            ghost.randomTarget = {
+                                x: Math.floor(Math.random() * this.MAZE_WIDTH),
+                                y: Math.floor(Math.random() * this.MAZE_HEIGHT)
+                            };
+                        }
+                        ghost.target = ghost.randomTarget;
+                        break;
                 }
                 
                 // Check if ghost is hitting an obstacle (can't continue in current direction)
